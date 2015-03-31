@@ -1,0 +1,102 @@
+fnJavaHome(){
+
+# The first existing directory is used for JAVA_HOME (if JAVA_HOME is not defined in $default)
+JDK_DIRS="/usr/lib/jvm/java-7-oracle /usr/lib/jvm/java-7-openjdk /usr/lib/jvm/java-7-openjdk-amd64/ /usr/lib/jvm/java-7-openjdk-i386/ /usr/lib/jvm/java-6-sun /usr/lib/jvm/java-6-openjdk /usr/lib/jvm/java-6-openjdk-amd64 /usr/lib/jvm/java-6-openjdk-i386 /usr/lib/jvm/default-java"
+
+# Look for the right JVM to use
+for jdir in $JDK_DIRS; do
+    if [ -r "$jdir/bin/java" -a -z "${JAVA_HOME}" ]; then
+        JAVA_HOME="$jdir"
+        JAVA=$JAVA_HOME/bin/java
+    fi
+done
+export JAVA_HOME
+
+}
+
+fnEc2WatchCheck() {
+
+    awsProfile=/etc/ec2Watch/aws_profile.conf
+
+    if [ -f $awsProfile ]
+    then
+        . $awsProfile
+    fi
+    
+    if [ -z $AWS_ACCESS_KEY ]
+    then
+        fnMsg "Please cheack your $awsProfile configuration file. You have a problem with the AWS_ACCESS_KEY variable" "err"
+        exit 1;
+    elif [ -z $AWS_SECRET_KEY ]
+    then
+        fnMsg "Please cheack your $awsProfile configuration file. You have a problem with the AWS_SECRET_KEY variable" "err"
+        exit 1;
+    elif [ -z $EC2_BIN ]
+    then
+        fnMsg "Please cheack your $awsProfile configuration file. You have a problem with the EC2_BIN variable" "err"
+        exit 1;
+    fi
+    
+    if [ ! -f $EC2_BIN/ec2-describe-instances ]
+    then
+        fnMsg "$EC2_BIN/ec2-describe-instances doesn't exist. Please check your EC2_HOME in $awsProfile or EC2 management tools installation" "err"
+        exit 1;
+    fi
+
+}
+
+fnCheckJava() {
+    if [ -x "$JAVA_HOME/bin/java" ]; then
+        JAVA="$JAVA_HOME/bin/java"
+    else
+        JAVA=$(which JAVA)
+    fi
+
+    if [ ! -x "$JAVA" ]; then
+        fnMsg 'Could not find any executable JAVA binary. Please install JAVA in your PATH or set JAVA_HOME' 'crit'
+        exit 1
+    fi
+}
+
+
+fnSwitchIP() {
+
+    if [ ! $ec2PrivIp ]
+    then
+        ec2PrivIp=`$EC2_BIN/ec2-describe-network-interfaces | grep $ec2PubIp | awk '{print $5}'` 
+    fi
+
+
+    getInstanceID=`/usr/bin/curl --silent http://169.254.169.254/latest/meta-data/instance-id`
+    getInterfaceID=`$EC2_BIN/ec2-describe-instances $getInstanceID | grep eni -m 1 | awk '{print $2;}'` 
+
+    if [ $ec2PrivIp ]
+    then
+        checkBeforeSwitching=`/sbin/ifconfig | grep -Fqe $ec2PrivIp ; echo $?`
+
+        if [ $checkBeforeSwitching -eq 0 ]
+        then
+#            $EC2_BIN/ec2-assign-private-ip-addresses -n $getInterfaceID --secondary-private-ip-address $ec2PrivIp --allow-reassignment >> $logFile
+            fnMsg "$ec2PrivIp" "-- info -- "
+            fnMsg "Takeover in progress for $ec2PrivIp to $getInterfaceID for `hostname --fqdn`" 'info'
+            sleep 60
+            exit $checkBeforeSwitching
+        else
+            fnMsg "Can't takeover for $ec2PrivIp to $getInterfaceID because I don't have $ec2PrivIp" 'crit'
+            fnMsg "Problem occurred for the migration $ec2PrivIp to `hostname --fqdn`. The reason is probably : $ec2PrivIp is not owned by server" 'crit'
+            exit $CheckBeforeSwitching
+        fi
+
+    else
+        fnMsg "Can't takeover for $instance, unable to get ec2PrivIp value. Please check your configuration file" 'crit'
+        fnMsg "Problem occurred for the migration $instance to `hostname --fqdn`. Unable to get ec2PrivIp value" 'crit'
+        exit 1
+    fi
+}
+
+fnSwitch() {
+    fnJavaHome
+    fnEc2WatchCheck
+    fnCheckJava
+    fnSwitchIP
+}

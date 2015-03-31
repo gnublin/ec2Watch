@@ -1,0 +1,36 @@
+mgLockFile=/var/lock/mg-$instance.lock
+
+fnmongo() {
+
+if [ ! -x $mgclient ]
+then
+    checkResult=999
+    fnMsg 'mongo client missing' 'crit'
+else
+    if [ $ip ] && [ $mgport ]
+    then
+        isPrimary=`echo "rs.isMaster().ismaster" | $mgclient --host $ip --port $mgport --quiet`
+        ipOwner=`ifconfig | grep "$ip" | wc -l`
+
+        if  $isPrimary && [ $ipOwner -eq 1 ] && [ "`cat $mgLockFile`" != "PRIMARY" ]
+        then
+            checkResult=1
+        elif $isPimary && [ $ipOwner -eq 0 ]
+        then
+            checkResult=999
+            fnMsg "$ip is not owned by me" "err"
+        elif ! $isPrimary
+        then
+            checkResult=0
+        fi
+
+        echo $isPrimary > $mgLockFile
+    else
+        checkResult=999
+        fnMsg "mongo mghost and mgport parameters missing in configfile" "crit"
+    fi
+
+fi
+
+}
+

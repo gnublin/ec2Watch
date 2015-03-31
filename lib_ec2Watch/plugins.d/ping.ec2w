@@ -1,0 +1,18 @@
+fnping() {
+
+checkPing=`ping -t $pingTTL -c $pingCount $ip>/dev/null 2>&1 ; echo $?`
+
+if [ $checkPing -eq 0 ]
+then
+    checkResult=0 
+elif [ $checkPing -eq 1 ]
+then
+    checkResult=1 
+    fnMsg "Take over in progress on `hostname`" 'info'
+else
+    checkResult=999
+    fnMsg "Ping command problem on `hostname`" 'err'
+fi
+
+}
+

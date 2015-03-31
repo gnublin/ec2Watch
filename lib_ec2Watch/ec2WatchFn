@@ -1,0 +1,73 @@
+default=/etc/default/ec2Watch
+ec2WatchConf=/etc/ec2Watch/$instance.conf
+ec2WatchPlugins=/usr/lib/ec2Watch/plugins.d
+ec2WatchScripts=/usr/lib/ec2Watch/scripts.d
+
+logFilePath=/var/log/ec2Watch
+logFile=$logFilePath/ec2Watch-$instance.log
+lockFile=/var/lock/ec2Watch-$instance.lock
+
+fnMsg() {
+
+    if [ ! -d $logFilePath ]
+    then
+        mkdir $logFilePath
+    fi
+
+    msg=$1
+    crit=$2
+    msg="`date +%Y%m%d-%H%M%S` [$instance] [$crit]: $msg"
+    echo $msg >>$logFile
+
+    if [ $mailTo ]
+    then
+        echo $msg | mail -s "Ec2Watch Error on `hostname`" $mailTo
+    fi
+
+}
+
+fnEc2WatchCheckConf() {
+
+    if [ -f $default ]
+    then
+        . $default
+    else
+        fnMsg "$default file missing" 'err'
+    fi
+
+    if [ -f $ec2WatchConf ]
+    then
+        . $ec2WatchConf
+    else
+        fnMsg "$ec2WatchConf is missing" 'err'
+        exit 1
+    fi
+
+}
+
+fnEc2WatchCheckPlugin(){
+
+    if [ -z $plugin ]
+    then
+        fnMsg 'ec2Check argument (plugin) missing' 'err'
+        exit 1
+    fi
+
+    if [ -z $ip ]
+    then
+        fnMsg 'ec2Check argument (ip)  missing' 'err'
+        exit 1
+    fi
+
+    if [ -z $script ]
+    then
+        fnMsg 'ec2Check argument (script)  missing' 'err'
+        exit 1
+    fi
+
+    if [ -f "$ec2WatchScripts/${script}.ec2w" ]
+    then
+        . $ec2WatchScripts/${script}.ec2w
+    fi
+}
+

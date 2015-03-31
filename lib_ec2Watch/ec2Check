@@ -1,0 +1,39 @@
+#!/bin/bash
+
+instance=$1
+
+ec2WatchFunction='/usr/lib/ec2Watch/ec2WatchFn'
+ec2WatchPlugins='/usr/lib/ec2Watch/plugins.d'
+ec2WatchScripts='/usr/lib/ec2Watch/scripts.d'
+
+if [ -f $ec2WatchFunction ]
+then
+    . $ec2WatchFunction
+    fnEc2WatchCheckConf
+    fnEc2WatchCheckPlugin
+else
+    echo 'ec2Watch function file  is missing.'
+    exit 1
+fi
+
+if [ -d $ec2WatchPlugins ]
+then
+    for ec2wPlug in `ls $ec2WatchPlugins`
+    do
+    . $ec2WatchPlugins/$ec2wPlug
+    done
+fi
+
+if [ "`type -t fn$plugin`" == 'function' ]
+then
+    fn$plugin 
+fi
+    
+if [ $checkResult -eq 1 ]
+then
+    fnSwitch
+elif [ $checkResult -eq 999 ]
+then
+    fnMsg "Exiting daemon with error. Check $plugin fail" 'err'
+    exit 1
+fi

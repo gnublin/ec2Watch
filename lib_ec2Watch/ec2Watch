@@ -1,0 +1,27 @@
+#!/bin/bash
+
+instance=$1
+ec2WatchFunction='/usr/lib/ec2Watch/ec2WatchFn'
+
+if [ -f $ec2WatchFunction ]
+then
+    . $ec2WatchFunction
+    fnEc2WatchCheckConf
+    fnEc2WatchCheckPlugin
+else
+    fnMsg 'ec2Watch function file  is missing.' 'err'
+    exit 1
+fi
+
+fnMsg "Starting daemon on `hostname` with $plugin check..." 'info'
+
+while :
+do
+    $ec2WHome/ec2Check $instance
+    fail=`echo $?`
+    if [ $fail -eq 1 ]
+    then
+        exit 1
+    fi
+    sleep $int
+done

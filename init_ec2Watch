@@ -1,0 +1,111 @@
+#!/bin/bash
+#
+# /etc/init.d/ec2Watch -- startup script for monitor ec2 interface instance
+#
+# Written by Gauthier FRANCOIS gauthier@openux.org
+#
+### BEGIN INIT INFO
+# Provides:          ec2Watch
+# Required-Start:    $network $remote_fs $named
+# Required-Stop:     $network $remote_fs $named
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Starts ec2Watch
+# Description:       Starts ec2Watch using start-stop-daemon
+### END INIT INFO
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin
+NAME=$(basename $0)
+DESC='EC2 interface watcher'
+
+default=/etc/default/ec2Watch
+ec2WHome=/usr/lib/ec2Watch
+ec2WDaemon=$ec2WHome/ec2Watch
+instance=${NAME##ec2Watch-}
+
+logFile=/var/log/ec2Watch/ec2Watch-$instance.log
+pidFile=/var/run/ec2Watch-$instance.pid
+
+
+if [ -L $instance ]
+then
+    echo -e 'You should create a symbolic link like ec2Watch-plugin-name or ec2Watch-ip.pu.bl.ic\n\t ex : ln -s /etc/init.d/ec2Watch /etc/init.d/ec2Watch-your.public.i.p'
+    exit 1 
+fi
+
+if [ `id -u` -ne 0 ]; then
+    echo 'You need root privileges to run this script'
+    exit 1
+fi
+
+. /lib/lsb/init-functions
+
+if [ -r /etc/default/rcS ]; then
+    . /etc/default/rcS
+fi
+
+
+if [ -f "$default" ]
+then
+    . "$default"
+fi
+
+if [ ! -f $logFile ]
+then
+    touch $logFile
+fi
+
+if [ "$START_DAEMON" != "yes" ]
+then
+    echo "Please edit the $default configuration file and change the START_DAEMON value to yes"
+    exit 1;
+fi
+
+case "$1" in
+  start)
+    log_daemon_msg "Starting $DESC for $instance"
+    pid=`pgrep -f "$ec2WDaemon $instance"`
+    echo $pid>$pidFile
+    if [ -n "$pid" ] ; then
+        log_progress_msg "(already running)"
+        log_end_msg 0
+        echo "PID: "`cat $pidFile`
+        exit 0
+    fi
+
+    # Start Daemon
+    start-stop-daemon --start -b --pidfile $pidFile --make-pid --name "ec2Watch-$pid" --exec $ec2WDaemon $instance
+    log_end_msg " $? "
+    ;;      
+  stop)
+    log_daemon_msg "Stopping $DESC for $instance"
+
+    if [ -f "$pidFile" ]; then 
+        start-stop-daemon --stop --pidfile $pidFile --retry=TERM/20/KILL/5 
+        if [ $? -eq 1 ]; then
+            log_progress_msg "$DESC for $instance is not running but pid file exists, cleaning up"
+        elif [ $? -eq 3 ]; then
+            PID="`cat $pidFile`"
+            log_failure_msg "Failed to stop $DESC for $instance (pid $PID)"
+            exit 1
+        fi
+        rm -f "$pidFile"
+    else
+        log_progress_msg "(not running)"
+    fi
+    log_end_msg 0
+    ;;
+  status)
+    status_of_proc -p $pidFile && exit 0 || exit $?
+    ;;
+  restart|force-reload)
+    $0 stop && sleep 2 && $0 start
+    ;;
+  *)
+    log_success_msg "Usage: $0 {start|stop|restart|force-reload|status}"
+    exit 1
+    ;;
+esac
+
+exit 0
+

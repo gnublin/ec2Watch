@@ -1,0 +1,17 @@
+# Start ec2watcher 
+START_DAEMON=yes
+
+# Path of the ec2watcher installation
+ec2WHome='/usr/lib/ec2Watch'
+ec2WDaemon="$ec2WHome/ec2Watch"
+
+# Interval for instance check
+int=2
+
+# default mongo plugin #
+mgclient='/usr/bin/mongo'
+mgport='27017'
+
+# default ping plugin #
+pingTTL=2
+pingCount=3
